@@ -50,32 +50,47 @@ public class Position extends Message {
     public static final String KEY_VIDEO = "video";
     public static final String KEY_AUDIO = "audio";
 
-    //For Mga
+    // For Mga
     public static final String KEY_GSM = "gsmSignal";
     public static final String KEY_TECHNOLOGY = "technology";
     public static final String KEY_RFID = "rfid";
-    public static final String KEY_LAC = "lac";
-    public static final String KEY_CID = "cid";
+    public static final String KEY_MNC = "mnc";
+    public static final String KEY_MCC = "mcc";
+
+    public static final String KEY_SIGNAL1 = "signal1";
+    public static final String KEY_RADIO1 = "Radio1";
+    public static final String KEY_LAC1 = "lac1";
+    public static final String KEY_CID1 = "cid1";
+
+    public static final String KEY_SIGNAL2 = "signal2";
+    public static final String KEY_RADIO2 = "Radio2";
+    public static final String KEY_LAC2 = "lac2";
+    public static final String KEY_CID2 = "cid2";
+
+    public static final String KEY_SIGNAL3 = "signal3";
+    public static final String KEY_RADIO3 = "Radio3";
+    public static final String KEY_LAC3 = "lac3";
+    public static final String KEY_CID3 = "cid3";
+
+    public static final String KEY_SIGNAL4 = "signal4";
+    public static final String KEY_RADIO4 = "Radio4";
+    public static final String KEY_LAC4 = "lac4";
+    public static final String KEY_CID4 = "cid4";
+
+    public static final String KEY_SIGNAL5 = "signal5";
+    public static final String KEY_RADIO5 = "Radio5";
+    public static final String KEY_LAC5 = "lac5";
+    public static final String KEY_CID5 = "cid5";
+
+    public static final String KEY_SIGNAL6 = "signal6";
+    public static final String KEY_RADIO6 = "Radio6";
+    public static final String KEY_LAC6 = "lac6";
+    public static final String KEY_CID6 = "cid6";
+
     public static final String KEY_SIM_SLOT = "simSlot";
     public static final String KEY_MECHANIC_CLOSE = "mechanicClose";
     public static final String KEY_COIL_OPEN = "coilOpen";
-    public static final String KEY_FLAG_1 = "flag1";
-    public static final String KEY_LAC_1 = "lac1";
-    public static final String KEY_CID_1 = "cid1";
-    public static final String KEY_FLAG_2 = "flag2";
-    public static final String KEY_LAC_2 = "lac2";
-    public static final String KEY_CID_2 = "cid2";
-    public static final String KEY_FLAG_3 = "flag3";
-    public static final String KEY_LAC_3 = "lac3";
-    public static final String KEY_CID_3 = "cid3";
-    public static final String KEY_FLAG_4 = "flag4";
-    public static final String KEY_LAC_4 = "lac4";
-    public static final String KEY_CID_4 = "cid4";
     public static final String KEY_GEOFENCES = "geofences";
-
-
-
-
 
     // The units for the below four KEYs currently vary.
     // The preferred units of measure are specified in the comment for each.
@@ -243,6 +258,26 @@ public class Position extends Message {
 
     public void setDeviceTime(Date deviceTime) {
         this.deviceTime = deviceTime;
+    }
+
+    private Date gpsDelay;
+
+    public Date getGpsDelay() {
+        return gpsDelay;
+    }
+
+    public void setGpsDelay(Date gpsDelay) {
+        this.gpsDelay = gpsDelay;
+    }
+
+    private Date btsDelay;
+
+    public Date getBTSDelay() {
+        return btsDelay;
+    }
+
+    public void setBTSDelay(Date btsDelay) {
+        this.btsDelay = btsDelay;
     }
 
     private Date fixTime;

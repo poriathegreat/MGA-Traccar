@@ -41,14 +41,16 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
         return decodeBinary(buf, channel, remoteAddress);
     }
 
-    private List<Position> decodeBinary(ByteBuf buf, Channel channel, SocketAddress remoteAddress) throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidAlgorithmParameterException, InvalidKeyException {
+    private List<Position> decodeBinary(ByteBuf buf, Channel channel, SocketAddress remoteAddress)
+            throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException,
+            InvalidAlgorithmParameterException, InvalidKeyException {
 
         List<Position> positions = new LinkedList<>();
 
         if (buf.readableBytes() < 1) {
             return null;
         }
-        //*******************************Frame*******************************
+        // *******************************Frame*******************************
 
         LOGGER.info("~~ Received {}Bytes --- Starting Decode ~~", buf.readableBytes());
 
@@ -66,9 +68,9 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
         /* Extract Expected Length (2 Bytes) */
         int length = Short.reverseBytes(buf.readShort()) & 0xFFFF;
 
-        LOGGER.info("SOF: {} | EXPECTED LEN: {}B | RECEIVED LEN: {}B", sof, length+1, buf.readableBytes());
+        LOGGER.info("SOF: {} | EXPECTED LEN: {}B | RECEIVED LEN: {}B", sof, length + 1, buf.readableBytes());
         if (buf.readableBytes() < length + 1) {
-            LOGGER.info("ERROR: Expected len {}B LESS THAN received len {}B", length+1, buf.readableBytes());
+            LOGGER.info("ERROR: Expected len {}B LESS THAN received len {}B", length + 1, buf.readableBytes());
             return null;
         }
 
@@ -91,7 +93,7 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
         int receivedCRC = buf.readUnsignedShort();
         LOGGER.info("Received CRC: {}", receivedCRC);
         int expectedCRC = receivedCRC;
-        if(receivedCRC != expectedCRC) {
+        if (receivedCRC != expectedCRC) {
             LOGGER.info("Received CRC: {} != Expected CRC", receivedCRC, expectedCRC);
             return null;
         }
@@ -103,19 +105,19 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
             LOGGER.info("EOF: {} != 0x55", eof);
             return null;
         }
-        //*******************************Payload*******************************
+        // *******************************Payload*******************************
         // --- Prepare cipher ---
         Cipher cipher = Cipher.getInstance("AES/CTR/NoPadding");
         byte[] key = new byte[16];
         byte[] iv = new byte[16];
-        for (int i = 0; i < 16; i++){
+        for (int i = 0; i < 16; i++) {
             key[i] = (byte) i;
             iv[i] = (byte) (i + 0x10);
         }
         SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
         IvParameterSpec ivSpec = new IvParameterSpec(iv);
         cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
-        //cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
+        // cipher.init(Cipher.ENCRYPT_MODE, keySpec, ivSpec);
 
         /* Start of Payload (1 Byte) */
         byte[] decrypted = encryptedPayload;
@@ -154,16 +156,18 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
             return null;
         }
 
-        //*******************************Packets*******************************
+        // *******************************Packets*******************************
         /* Read the combined packets into dataBuf for further processing */
         ByteBuf dataBuf = Unpooled.wrappedBuffer(packetsCombined);
 
         /* Read packets received from dataBuf one by one, packetCount times. */
         for (int i = 0; i < packetCount; i++) {
-            //LOGGER.info("packet number: {}", i);
+            // LOGGER.info("packet number: {}", i);
 
-            /* Set the device ID of the position packet,
-             * based on the previously processed Serial Number */
+            /*
+             * Set the device ID of the position packet,
+             * based on the previously processed Serial Number
+             */
             Position position = new Position(getProtocolName());
             position.setDeviceId(deviceSession.getDeviceId());
 
@@ -190,25 +194,31 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
 
             /* Extract the Type (1 Byte) */
             int dataType = dataBuf.readUnsignedByte();
-            //LOGGER.info("Data Type: {}", dataType);
-            if (dataType != 17 && dataType != 18) continue;
-            //LOGGER.info("Passed: {}", dataType);
+            // LOGGER.info("Data Type: {}", dataType);
+            if (dataType != 33)
+                continue;
+            // LOGGER.info("Passed: {}", dataType);
 
             /* Extract the Length (1 Byte) */
             int dataLength = dataBuf.readUnsignedByte();
 
             /* Extract the Data (Length Bytes) */
             if (dataBuf.readableBytes() < dataLength) {
-                LOGGER.info("ERROR: Expected Data Length={} > Remaining Data Length={}", dataType, dataBuf.readableBytes());
+                LOGGER.info("ERROR: Expected Data Length={} > Remaining Data Length={}", dataType,
+                        dataBuf.readableBytes());
                 break;
             }
 
-            /* Load dataLength bytes of dataBuf for processing,
+            /*
+             * Load dataLength bytes of dataBuf for processing,
              * this is the data containing information based on the
-             * packet type. */
+             * packet type.
+             */
             byte[] data = new byte[dataLength];
             dataBuf.readBytes(data);
-            // LOGGER.info("data: {}", ByteBufUtil.hexDump(Unpooled.wrappedBuffer(data)).replaceAll("(.{2})", "$1 "));
+            // LOGGER.info("data: {}",
+            // ByteBufUtil.hexDump(Unpooled.wrappedBuffer(data)).replaceAll("(.{2})", "$1
+            // "));
 
             /* End of Data (1 Byte) */
             byte eod = dataBuf.readByte();
@@ -217,48 +227,25 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
                 break;
             }
 
-            LOGGER.info("Processing Packet: {}/{}, Type={}, Length={}", i+1, packetCount, dataType, dataLength);
+            LOGGER.info("Processing Packet: {}/{}, Type={}, Length={}", i + 1, packetCount, dataType, dataLength);
 
             ByteBuf wrappedData = Unpooled.wrappedBuffer(data);
 
-            /* Extract the Alarm Code (1 Byte) */
-            int alarmCode = wrappedData.readUnsignedByte();
+            /* Extract the Alarm Code (2 Byte) */
+            int alarmCode = Short.reverseBytes(wrappedData.readShort());
             findAlarm(alarmCode, position);
+            position.set(Position.KEY_ALARM, alarmCode);
 
             /* Flags P1 */
             int flags1 = wrappedData.readByte();
-
-            /* Tech (2g, 3g, 4g, 5g, other) */
-            int tech = flags1 & 0b00000111;
-            switch (tech) {
-                case 0:
-                    position.set(Position.KEY_TECHNOLOGY, "-");
-                    break;
-                case 1:
-                    position.set(Position.KEY_TECHNOLOGY, "-");
-                    break;
-                case 2:
-                    position.set(Position.KEY_TECHNOLOGY, "2G");
-                    break;
-                case 3:
-                    position.set(Position.KEY_TECHNOLOGY, "3G");
-                    break;
-                case 4:
-                    position.set(Position.KEY_TECHNOLOGY, "4G");
-                    break;
-                case 5:
-                    position.set(Position.KEY_TECHNOLOGY, "5G");
-                    break;
-                default:
-                    position.set(Position.KEY_TECHNOLOGY, "-");
-                    break;
-            }
 
             /* Extract flag one - bit four: Simcard slot in use */
             boolean isSimTwo;
             isSimTwo = (flags1 & 0b00001000) != 0;
             int simSlot = 1;
-            if (isSimTwo) {simSlot = 2;}
+            if (isSimTwo) {
+                simSlot = 2;
+            }
             position.set(Position.KEY_SIM_SLOT, simSlot);
 
             /* Extract flag one - bit five: Charge status */
@@ -279,7 +266,6 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
             /* Extract flag one - bit eight: LAC/CID Validity (0 = Not Valid, 1 = Valid) */
             boolean lacCidValidity;
             lacCidValidity = (flags1 & 0b10000000) != 0;
-
 
             int flags2 = wrappedData.readByte();
 
@@ -304,180 +290,164 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
             position.set(Position.KEY_COIL_OPEN, isCoilOpen);
 
             /* Extract flag two - bit five: Extended packet status (1 = extended packet) */
-            boolean isExtended;
-            isExtended = (flags2 & 0b00010000) != 0;
+            // boolean isExtended;
+            // isExtended = (flags2 & 0b00010000) != 0;
 
-            /* Extract the GSM Signal (1 Byte) */
-            int gsmSignal = wrappedData.readByte();
-            position.set(Position.KEY_GSM, gsmSignal);
-
-            /* Extract the RESERVE Bytes (2 Byte) */
-            int reserve = (Short.reverseBytes(wrappedData.readShort()) & 0xFFFF);
+            /* Extract the Geofences bitwise flags (2 Byte) */
+            long geofences = Short.reverseBytes(wrappedData.readShort());
+            position.set(Position.KEY_GEOFENCES, geofences);
 
             /* Extract the Battery Voltage (2 Byte) */
             double batteryVoltage = (double) (Short.reverseBytes(wrappedData.readShort()) & 0xFFFF) / 1000;
             position.set(Position.KEY_BATTERY, batteryVoltage);
 
-            /* Extract the Humidity (1 Byte) */
-            int humidity = wrappedData.readByte();
-            position.set(Position.KEY_HUMIDITY, humidity);
-
             /* Extract the Temperature (1 Byte) */
             int temperature = wrappedData.readByte();
             position.set(Position.KEY_DEVICE_TEMP, temperature);
 
-            /* Extract the LAC (2 Bytes) */
-            long lac = Short.reverseBytes(wrappedData.readShort());
-            position.set(Position.KEY_LAC, lac);
-
-            /* Extract the CID (2 Bytes) */
-            long cid = Short.reverseBytes(wrappedData.readShort());
-            position.set(Position.KEY_CID, cid);
-
-            /* Extract the Geofences bitwise flags (2 Byte) */
-            long geofences = Short.reverseBytes(wrappedData.readShort());
-            position.set(Position.KEY_GEOFENCES, geofences);
+            /* Extract the Humidity (1 Byte) */
+            int humidity = wrappedData.readByte();
+            position.set(Position.KEY_HUMIDITY, humidity);
 
             /* Extract the Unix Time (4 Bytes) */
             long unixTime = Integer.reverseBytes(wrappedData.readInt());
             Date date = new Date(unixTime * 1000L);
             position.setDeviceTime(date);
 
-            LOGGER.info("--AlarmCode={}|Network={}G|SimSlot={}|Charging={}|GNSSFix={}|Motion={}|CIDValid={}|UnlockAllowed={}|",
-                    alarmCode, tech, simSlot, isCharging, isFixed, !isStop, lacCidValidity, isUnlockAllowed);
+            /* Extract the Unix Time (4 Bytes) */
+            long GPSDelay = Integer.reverseBytes(wrappedData.readInt());
+            date = new Date(GPSDelay * 1000L);
+            position.setGpsDelay(date);
 
-            LOGGER.info("--RopeClosed={}|MechanicClosed={}|CoilActive={}|GSM Signal={}%|Battery={}V|Humidity={}%|Temperature={}C|",
-                    isRopeClosed, isMechanicClosed, isCoilOpen, gsmSignal, batteryVoltage, humidity, temperature);
-
-            LOGGER.info("--LAC={}|CID={}|Geofences={}|TimeStamp={}|Date&Time={}|",
-                    lac, cid, geofences, unixTime, date);
-
-            position.set(Position.KEY_ALARM, alarmCode);
-            switch (dataType) {
-                case (byte) 0x11: {
-                    /* Packet 0x11 means the device is sending position via GNSS */
-
-                    /* Extract the Since Last Fix, provided in seconds. (4 Bytes) */
-                    long sinceTime = Integer.reverseBytes(wrappedData.readInt());
-                    Date since = new Date(sinceTime * 1000L);
-                    position.setFixTime(since);
-
-                    /* Extract the Latitude, the value must be divided by 100000 (4 Bytes) */
-                    long lat = Integer.reverseBytes(wrappedData.readInt());
-                    double latitude = (double) lat / 1000000;
-                    if (latitude <= 90 && latitude >=-90) {
-                        position.setLatitude(latitude);
-                    }
-
-                    /* Extract the Longitude, the value must be divided by 100000 (4 Bytes) */
-                    long lon = Integer.reverseBytes(wrappedData.readInt());
-                    double longitude = (double) lon / 1000000;
-                    if (longitude <= 90 && longitude >= -90) {
-                        position.setLongitude(longitude);
-                    }
-
-                    /* Extract the Bearing (2 Bytes) */
-                    int bearing = Short.reverseBytes(wrappedData.readShort());
-                    if (bearing < 360 && bearing >= 0) {
-                        position.setCourse(bearing);
-                    }
-
-                    /* Extract the Position Dilution Of Precision (2 Bytes) */
-                    double PDOP = (double) (Short.reverseBytes(wrappedData.readShort())) / 100;
-                    position.set(Position.KEY_PDOP, PDOP);
-                    /*
-                     * I moved the set valid to gps fix flag. */
-                    // if (pdop < 3) {
-                    //     position.setValid(true);
-                    // }
-
-                    /* Extract the number of satellites connected (1 Byte) */
-                    int sat = wrappedData.readByte();
-                    position.set(Position.KEY_SATELLITES, sat);
-
-                    /* Extract the Speed in KM/H (1 Byte) */
-                    int speed = wrappedData.readByte();
-                    position.setSpeed(speed * 0.54);
-
-                    LOGGER.info("--SinceLastFix={}s|Latitude={}|Longitude={}|Course={}|PDOP={}|Satellites={}|Speed={}km/h|",
-                            sinceTime, latitude, longitude, bearing, PDOP, sat, speed);
-
-                    break;
-                }
-                case (byte) 0x12: {
-                    /* Packet 0x12 means the device is sending position via Cell Tower Information */
-
-                    /* Extract the Since Last Fix, provided in seconds. (4 Bytes) */
-                    long sinceTime = Integer.reverseBytes(wrappedData.readInt());
-                    Date since = new Date(sinceTime * 1000L);
-                    position.setFixTime(since);
-
-                    int bts1Flag = wrappedData.readByte();
-                    int bts2Flag = wrappedData.readByte();
-                    int bts3Flag = wrappedData.readByte();
-                    int bts4Flag = wrappedData.readByte();
-
-                    /* Extract the first neighbour LAC (2 Bytes) */
-                    long lac1 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_FLAG_1, bts1Flag);
-                    position.set(Position.KEY_LAC_1, lac1);
-
-                    /* Extract the neighbour CID (2 Bytes) */
-                    long cid1 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_CID_1, cid1);
-
-                    /* Extract the first neighbour LAC (2 Bytes) */
-                    long lac2 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_FLAG_2, bts2Flag);
-                    position.set(Position.KEY_LAC_2, lac2);
-
-                    /* Extract the neighbour CID (2 Bytes) */
-                    long cid2 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_CID_2, cid2);
-
-                    /* Extract the first neighbour LAC (2 Bytes) */
-                    long lac3 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_FLAG_3, bts3Flag);
-                    position.set(Position.KEY_LAC_3, lac3);
-
-                    /* Extract the neighbour CID (2 Bytes) */
-                    long cid3 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_CID_3, cid3);
-
-                    /* Extract the first neighbour LAC (2 Bytes) */
-                    long lac4 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_FLAG_4, bts4Flag);
-                    position.set(Position.KEY_LAC_4, lac4);
-
-                    /* Extract the neighbour CID (2 Bytes) */
-                    long cid4 = Short.reverseBytes(wrappedData.readShort());
-                    position.set(Position.KEY_CID_4, cid4);
-
-                    LOGGER.info("--SinceLastFix={}s|FLAGS:1={}|2={}|3={}|4={}|LAC-CID-: 1={}-{}|2={}-{}|3={}-{}|4={}-{}|",
-                            sinceTime, bts1Flag, bts2Flag, bts3Flag, bts4Flag, lac1, cid1, lac2, cid2, lac3, cid3, lac4, cid4);
-
-                    break;
-                }
-                default: {
-                    break;
-                }
+            /* Extract the Latitude (4 Bytes) */
+            long lat = Integer.reverseBytes(wrappedData.readInt());
+            double latitude = (double) lat / 1000000;
+            if (latitude <= 90 && latitude >= -90) {
+                position.setLatitude(latitude);
             }
 
-
-
-            /* Check if the packet is extended */
-            if(isExtended) {
-                int extendedType = wrappedData.readByte();
-                if (extendedType == (byte) 0x01) {/* Illegal RFID Number */
-                    long rfid = Integer.reverseBytes(wrappedData.readInt());
-                    position.set(Position.KEY_RFID, rfid);
-                    LOGGER.info("--ExtendedPacket!! ExtendedType={}|RFID={}",
-                            extendedType, rfid);
-                } else {
-                    LOGGER.info("--ExtendedPacket!! ExtendedType={}|UNKNOWN!",
-                            extendedType);
-                }
+            /* Extract the Longitude (4 Bytes) */
+            long lon = Integer.reverseBytes(wrappedData.readInt());
+            double longitude = (double) lon / 1000000;
+            if (longitude <= 90 && longitude >= -90) {
+                position.setLongitude(longitude);
             }
+
+            /* Extract the bearing (2 Bytes) */
+            long bearing = Short.reverseBytes(wrappedData.readShort());
+            if (bearing < 360 && bearing >= 0) {
+                position.setCourse(bearing);
+            }
+
+            /* Extract the PDOP (2 Bytes) */
+            long PDOP = Short.reverseBytes(wrappedData.readShort());
+            position.set(Position.KEY_PDOP, PDOP / 100);
+
+            /* Extract the Satellite (1 Byte) */
+            int Satellite = wrappedData.readByte();
+            position.set(Position.KEY_SATELLITES, Satellite);
+
+            /* Extract the Speed (1 Byte) */
+            int Speed = wrappedData.readByte();
+            position.setSpeed(Speed);
+
+            /* Extract the Unix Time (4 Bytes) */
+            long BTSDelay = Integer.reverseBytes(wrappedData.readInt());
+            date = new Date(BTSDelay * 1000L);
+            position.setBTSDelay(date);
+
+            /* Extract the MNC (2 Byte) */
+            int MNC = Short.reverseBytes(wrappedData.readShort());
+            position.set(Position.KEY_MNC, MNC);
+
+            /* Extract the MCC (2 Byte) */
+            int MCC = Short.reverseBytes(wrappedData.readShort());
+            position.set(Position.KEY_MCC, MCC);
+
+            int Signal = wrappedData.readByte();
+            position.set(Position.KEY_SIGNAL1, Signal);
+
+            int Radio = wrappedData.readByte();
+            position.set(Position.KEY_RADIO1, Radio);
+
+            int LAC = Short.reverseBytes(wrappedData.readShort());
+            position.set(Position.KEY_LAC1, LAC);
+
+            int CID = Short.reverseBytes(wrappedData.readShort());
+            position.set(Position.KEY_CID1, CID);
+            /* Extract the BTS */
+            boolean sixBts = (flags1 & 0b00000100) != 0;
+            if (sixBts) {
+                Signal = wrappedData.readByte();
+                position.set(Position.KEY_SIGNAL2, Signal);
+
+                Radio = wrappedData.readByte();
+                position.set(Position.KEY_RADIO2, Radio);
+
+                LAC = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_LAC2, LAC);
+
+                CID = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_CID2, CID);
+
+                Signal = wrappedData.readByte();
+                position.set(Position.KEY_SIGNAL3, Signal);
+
+                Radio = wrappedData.readByte();
+                position.set(Position.KEY_RADIO3, Radio);
+
+                LAC = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_LAC3, LAC);
+
+                CID = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_CID3, CID);
+
+                Signal = wrappedData.readByte();
+                position.set(Position.KEY_SIGNAL4, Signal);
+
+                Radio = wrappedData.readByte();
+                position.set(Position.KEY_RADIO4, Radio);
+
+                LAC = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_LAC4, LAC);
+
+                CID = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_CID4, CID);
+
+                Signal = wrappedData.readByte();
+                position.set(Position.KEY_SIGNAL5, Signal);
+
+                Radio = wrappedData.readByte();
+                position.set(Position.KEY_RADIO5, Radio);
+
+                LAC = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_LAC5, LAC);
+
+                CID = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_CID5, CID);
+
+                Signal = wrappedData.readByte();
+                position.set(Position.KEY_SIGNAL6, Signal);
+
+                Radio = wrappedData.readByte();
+                position.set(Position.KEY_RADIO6, Radio);
+
+                LAC = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_LAC6, LAC);
+
+                CID = Short.reverseBytes(wrappedData.readShort());
+                position.set(Position.KEY_CID6, CID);
+            }
+
+            LOGGER.info(
+                    "--AlarmCode={}|SimSlot={}|Charging={}|GNSSFix={}|Motion={}|CIDValid={}|UnlockAllowed={}|",
+                    alarmCode, simSlot, isCharging, isFixed, !isStop, lacCidValidity, isUnlockAllowed);
+
+            LOGGER.info(
+                    "--RopeClosed={}|MechanicClosed={}|CoilActive={}|Battery={}V|Humidity={}%|Temperature={}C|",
+                    isRopeClosed, isMechanicClosed, isCoilOpen, batteryVoltage, humidity, temperature);
+
+            LOGGER.info("--Geofences={}|TimeStamp={}|Date&Time={}|", geofences, unixTime, date);
 
             /* Save the gathered position data */
             positions.add(position);
@@ -485,7 +455,8 @@ public class MgaProtocolDecoder extends BaseProtocolDecoder {
 
         return positions;
     }
-    private void findAlarm (int alarmCode, Position position) {
+
+    private void findAlarm(int alarmCode, Position position) {
         switch (alarmCode) {
             case 201:
                 position.addAlarm(Position.ALARM_COURSE_CHANGE);
