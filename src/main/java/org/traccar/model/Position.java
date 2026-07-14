@@ -51,6 +51,9 @@ public class Position extends Message {
     public static final String KEY_AUDIO = "audio";
 
     // For Mga
+    public static final String KEY_GEOFENCE_MASK = "geofencesMask";
+    public static final String KEY_BTS_DELAY = "btsdelay";
+
     public static final String KEY_GSM = "gsmSignal";
     public static final String KEY_TECHNOLOGY = "technology";
     public static final String KEY_RFID = "rfid";
@@ -258,26 +261,6 @@ public class Position extends Message {
 
     public void setDeviceTime(Date deviceTime) {
         this.deviceTime = deviceTime;
-    }
-
-    private Date gpsDelay;
-
-    public Date getGpsDelay() {
-        return gpsDelay;
-    }
-
-    public void setGpsDelay(Date gpsDelay) {
-        this.gpsDelay = gpsDelay;
-    }
-
-    private Date btsDelay;
-
-    public Date getBTSDelay() {
-        return btsDelay;
-    }
-
-    public void setBTSDelay(Date btsDelay) {
-        this.btsDelay = btsDelay;
     }
 
     private Date fixTime;
